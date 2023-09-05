@@ -1,0 +1,162 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Product Search</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto p-4">
+        <h1 class="text-3xl font-bold  my-4">Product Search</h1>
+        <input
+            id="searchInput"
+            type="text"
+            class="w-full px-4 py-2 rounded-md border focus:outline-none focus:ring focus:border-blue-200"
+            placeholder="Search for a product..."
+        >
+        <div id="suggestions" class="mt-4 p-2"></div>
+        <h2 class="text-xl font-semibold mt-4">Selected Products:</h2>
+        <ul id="selectedProducts" class="list-disc pl-6 ">
+        </ul>
+        <table class="w-full border-collapse border ">
+            <thead>
+                <tr class="bg-blue-200">
+                    <th class="py-2 px-4">Name</th>
+                    <th class="py-2 px-4">Quantity</th>
+                    <th class="py-2 px-4">Price</th>
+                    <th class="py-2 px-4">Discount</th>
+                    <th class="py-2 px-4">Total</th>
+                    <th class="py-2 px-4">Remove</th>
+                </tr>
+            </thead>
+            <tbody id="table-body">
+            
+                <!-- Existing rows will be added here -->
+            </tbody>
+        </table>
+        <h3 class="text-xl font-semibold mt-4 ">Total Price: <span id="totalPrice"></span></h3>
+    </div>
+
+    <script>
+        let apiData = []; // Store the API data
+        let selectedProductsData = {}; // Store selected products and quantities
+
+        // Function to fetch product data from JSONPlaceholder
+        async function fetchProductData() {
+            try {
+                const response = await fetch('http://localhost:3000/products');
+                const data = await response.json();
+
+                return data.slice(0, 10); 
+            } catch (error) {
+                console.error('Error fetching product data:', error);
+                return [];
+            }
+        }
+
+      async function addRow(product) {
+        const { id, title ,prices} = product;
+        const name = title;
+        const quantity = 1;
+        const price = prices 
+        const discount = Math.floor(Math.random() * 50).toFixed(2); 
+        const total = (quantity * price * (100 - discount) / 100).toFixed(2);
+
+        // Check if the product name already exists in selected products
+        if (selectedProductsData[name]) {
+            selectedProductsData[name].quantity += 1;
+            selectedProductsData[name].total = (
+                selectedProductsData[name].quantity *
+                selectedProductsData[name].price *
+                (100 - selectedProductsData[name].discount) /
+                100
+            ).toFixed(2);
+            // Update the quantity and total in the table cells
+            const quantityCell = document.querySelector(`.quantity[data-name="${name}"]`);
+            const totalCell = document.querySelector(`.total[data-name="${name}"]`);
+            if (quantityCell && totalCell) {
+                quantityCell.textContent = selectedProductsData[name].quantity;
+                totalCell.textContent = selectedProductsData[name].total;
+            }
+        } else {
+            // Create a new row
+            const newRow = document.createElement("tr");
+            newRow.innerHTML = `
+                <td>${name}</td>
+                <td class="quantity" data-name="${name}">${quantity}</td>
+                <td>${price}</td>
+                <td>${discount}%</td>
+                <td class="total" data-name="${name}">${total}</td>
+                <td><button class="bg-gray-200 px-3 py-1 rounded-md" onclick="removeRow('${name}')">Remove</button></td>
+            `;
+
+            // Append the new row to the table body
+            document.getElementById("table-body").appendChild(newRow);
+            // Store the selected product data
+            selectedProductsData[name] = { quantity, price, discount, total };
+        }
+
+        // Update the total price
+        updateTotalPrice();
+      }
+
+          
+
+        function updateTotalPrice() {
+            let totalPrice = 0;
+            for (const productName in selectedProductsData) {
+                totalPrice += parseFloat(selectedProductsData[productName].total);
+            }
+
+            document.getElementById("totalPrice").textContent = totalPrice.toFixed(2);
+        }
+
+        async function searchProducts() {
+            const searchTerm = document.getElementById("searchInput").value;
+            if (searchTerm.trim() === "") {
+                return;
+            }
+
+            apiData = await fetchProductData();
+            const suggestions = apiData.filter((product) =>
+                product.title.toLowerCase().includes(searchTerm.toLowerCase())
+            );
+
+            const suggestionsContainer = document.getElementById("suggestions");
+            suggestionsContainer.innerHTML = "";
+
+            suggestions.forEach((product) => {
+                const suggestionItem = document.createElement("div");
+                suggestionItem.textContent = product.title;
+                suggestionItem.classList.add("cursor-pointer", "hover:bg-gray-200");
+                suggestionItem.addEventListener("click", () => addRow(product));
+                suggestionsContainer.appendChild(suggestionItem);
+            });
+        }
+
+        function removeRow(productName) {
+            // Remove the row from the table
+            const tableBody = document.getElementById("table-body");
+            const rowToRemove = tableBody.querySelector(`tr:has(td[data-name="${productName}"])`);
+            tableBody.removeChild(rowToRemove);
+
+            // Remove the product from the selectedProductsData object
+            delete selectedProductsData[productName];
+            
+            // Update the total price
+            updateTotalPrice();
+        }
+
+        // Listen for input changes and call searchProducts
+        document.getElementById("searchInput").addEventListener("input", searchProducts);
+
+        // Initial call to add rows with product data
+        fetchProductData().then((data) => {
+            apiData = data;
+        });
+    </script>
+</body>
+</html>
